@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lumen · AI Lead Nurturing</title>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: #1d1d1f;
+    background: #f5f5f7;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-size: 13px;
+    letter-spacing: -0.01em;
+  }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.14); border-radius: 8px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.24); }
+  ::-webkit-scrollbar-track { background: transparent; }
+  input { font-family: inherit; }
+  @keyframes lumenFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @keyframes lumenDot { 0%, 60%, 100% { opacity: 0.25; } 30% { opacity: 1; } }
+  @keyframes lumenPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useMemo } = React;
+
+/* ---------- helpers ---------- */
+
+// Parse an inline CSS string ("a:b; c:d") into a React style object.
+function st(cssText) {
+  const out = {};
+  if (!cssText) return out;
+  cssText.split(';').forEach(decl => {
+    const i = decl.indexOf(':');
+    if (i === -1) return;
+    const prop = decl.slice(0, i).trim();
+    const val = decl.slice(i + 1).trim();
+    if (!prop) return;
+    const key = prop.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+    out[key] = val;
+  });
+  return out;
+}
+
+// Div that supports a hover style string (mirrors the design's style-hover).
+function Box({ style, hover, onClick, title, children }) {
+  const [h, setH] = useState(false);
+  const base = st(style);
+  const merged = h && hover ? { ...base, ...st(hover) } : base;
+  return (
+    <div
+      style={merged}
+      title={title}
+      onClick={onClick}
+      onMouseEnter={hover ? () => setH(true) : undefined}
+      onMouseLeave={hover ? () => setH(false) : undefined}
+    >
+      {children}
+    </div>
+  );
+}
+
+// Inline SVG icon rendered from raw markup (avoids attribute case conversion).
+function Icon({ html, style }) {
+  return <span style={{ display: 'inline-flex', ...(style || {}) }} dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+const ICONS = {
+  inbox: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18v9h-5l-2 3h-4l-2-3H3z"/></svg>',
+  pipeline: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="5" y1="6" x2="19" y2="6"/><line x1="5" y1="12" x2="14" y2="12"/><line x1="5" y1="18" x2="10" y2="18"/></svg>',
+  automations: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="18" r="2.4"/><path d="M8.4 6H15a3 3 0 0 1 3 3v6.6"/></svg>',
+  analytics: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5"/><path d="M4 19h16"/><rect x="7" y="11" width="3" height="5" rx="0.5"/><rect x="13" y="8" width="3" height="8" rx="0.5"/></svg>',
+  settings: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>',
+  search: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a1a1a6" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>',
+  plus: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+  back: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
+  email: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5l9 7 9-7"/><rect x="3" y="5" width="18" height="14" rx="2"/></svg>',
+  call: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L20 13l1 4v0a2 2 0 0 1-2 2A16 16 0 0 1 4 6a2 2 0 0 1 1-2z"/></svg>',
+  arrow: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>',
+  info: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#007aff" stroke-width="2" stroke-linecap="round" style="flex:none; margin-top:1px;"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>',
+  send: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>',
+  check: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#34c759" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex:none; margin-top:1px;"><path d="M20 6L9 17l-5-5"/></svg>',
+};
+
+/* ---------- data + domain logic (ported from the design) ---------- */
+
+function leadsData() {
+  return [
+    { id:'l1', name:'Marcus Chen', source:'WhatsApp', location:'Austin, TX', status:'hot', score:92, byAria:true, needsReply:true, time:'2m', snippet:'Can we tour the Mueller listing this Saturday?',
+      facts:[{label:'Budget',value:'$1.2M – $1.5M'},{label:'Timeline',value:'Within 30 days'},{label:'Pre-approved',value:'Yes · $1.4M'},{label:'Looking for',value:'4bd single-family'}],
+      scoreReason:'Pre-approved, tight timeline, and actively requesting tours.',
+      intentSummary:'Marcus is a high-intent buyer relocating for a new role at month-end. He is pre-approved at $1.4M, has toured two comps online, and explicitly asked to see the Mueller property this weekend. He responds within minutes and has no agent yet — move fast.',
+      timeline:[
+        {dot:'#34c759',title:'Requested a Saturday tour',detail:'Asked Aria about the Mueller 4bd listing',time:'2 minutes ago'},
+        {dot:'#007aff',title:'Aria qualified budget & timeline',detail:'Confirmed $1.4M pre-approval and 30-day move',time:'Today, 8:14 AM'},
+        {dot:'#007aff',title:'Aria sent 3 matching listings',detail:'Mueller, Tarrytown, and Zilker matches',time:'Yesterday, 6:40 PM'},
+        {dot:'#8e8e93',title:'Lead captured',detail:'Inbound via WhatsApp from Zillow ad',time:'3 days ago'}
+      ],
+      thread:[
+        {from:'aria',text:'Hi Marcus! I’m Aria from Hill Country Realty. I saw you were looking at homes in central Austin — happy to help you find the right fit. What’s your ideal budget range?',time:'Mon 6:32 PM'},
+        {from:'lead',text:'Hey! Looking somewhere around 1.2 to 1.5M. Relocating for work next month so kind of on a clock.',time:'Mon 6:38 PM'},
+        {from:'aria',text:'Perfect, that opens up some great options in Mueller and Tarrytown. Are you pre-approved yet, and how many bedrooms do you need?',time:'Mon 6:39 PM',reasoning:'Confirming financing + must-haves to score qualification. Budget + timeline already strong signals.'},
+        {from:'lead',text:'Pre-approved up to 1.4M. Need 4 bedrooms, ideally a yard for the dog.',time:'Mon 6:45 PM'},
+        {from:'aria',text:'Got it — I’ll send three 4-bedroom homes with yards in your range right now. The Mueller one is brand new to market and checks every box.',time:'Mon 6:47 PM'},
+        {from:'lead',text:'Can we tour the Mueller listing this Saturday?',time:'2m ago'}
+      ],
+      suggested:[
+        'Absolutely — Saturday works! I have 10:30 AM or 2:00 PM open at the Mueller home. Which suits you better?',
+        'Yes! Before I lock in Saturday, would you like to see the Tarrytown home in the same trip? It’s 8 minutes away.'
+      ],
+      talkingPoints:[
+        'Confirm the Saturday tour time immediately — he’s ready and competing listings move fast in Mueller.',
+        'He’s pre-approved at $1.4M, so the Mueller listing at $1.39M is right at the ceiling — anchor on value, not price.',
+        'Relocating for work in 30 days — emphasize quick-close logistics and remote document signing.',
+        'Has a dog — the fenced yard is a strong emotional hook worth leading with on the tour.'
+      ]
+    },
+    { id:'l2', name:'Priya Raman', source:'Website Form', location:'Seattle, WA', status:'hot', score:88, byAria:true, needsReply:true, time:'18m', snippet:'Aria scheduled a callback for 4 PM today' },
+    { id:'l3', name:'Elena Vasquez', source:'Zillow', location:'Miami, FL', status:'hot', score:79, byAria:true, needsReply:false, time:'1h', snippet:'Asked about waterfront condos over $2M' },
+    { id:'l4', name:'Lisa Wong', source:'Zillow', location:'San Diego, CA', status:'hot', score:84, byAria:true, needsReply:true, time:'1h', snippet:'Wants a second viewing of the La Jolla home' },
+    { id:'l5', name:'Anthony Russo', source:'CRM Import', location:'Boston, MA', status:'warm', score:67, byAria:true, needsReply:false, time:'3h', snippet:'Aria nurturing — comparing two neighborhoods' },
+    { id:'l6', name:'David Okafor', source:'Facebook Ad', location:'Denver, CO', status:'warm', score:64, byAria:true, needsReply:false, time:'5h', snippet:'Still deciding on timeline, leaning Q3' },
+    { id:'l7', name:'Sarah Mitchell', source:'Realtor.com', location:'Phoenix, AZ', status:'warm', score:58, byAria:true, needsReply:false, time:'Yesterday', snippet:'Re-engaged after Aria’s follow-up sequence' },
+    { id:'l8', name:'James Park', source:'Website Form', location:'Portland, OR', status:'warm', score:51, byAria:true, needsReply:false, time:'Yesterday', snippet:'Browsing 3bd homes, no budget confirmed yet' },
+    { id:'l9', name:'Tom Bradley', source:'WhatsApp', location:'Tampa, FL', status:'cold', score:31, byAria:true, needsReply:false, time:'2d', snippet:'In reactivation drip — opened 2 emails' },
+    { id:'l10', name:'Rachel Green', source:'Facebook Ad', location:'Nashville, TN', status:'cold', score:22, byAria:false, needsReply:false, time:'4d', snippet:'Just exploring, no timeline shared' }
+  ];
+}
+
+function statusMap(s) {
+  if (s === 'hot') return { color:'#1fae54', bg:'rgba(52,199,89,0.12)', label:'HOT' };
+  if (s === 'warm') return { color:'#d98a00', bg:'rgba(245,166,35,0.14)', label:'WARM' };
+  return { color:'#8e8e93', bg:'rgba(142,142,147,0.14)', label:'COLD' };
+}
+
+function avatarPalette(i) {
+  const p = [
+    ['#e3effd','#0a6bd6'],['#fde7ef','#c2185b'],['#eaf6ec','#1fae54'],
+    ['#fff2dd','#b87503'],['#eee9fb','#6033c6'],['#e6f4f6','#0a7d8c'],
+    ['#fde9e7','#c0392b'],['#eef0f5','#42526e'],['#f0eafb','#7b2fc6'],['#e8f0fe','#1d4ed8']
+  ];
+  return p[i % p.length];
+}
+
+function initials(name) {
+  return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+}
+
+function decorateMsg(m) {
+  const isLead = m.from === 'lead';
+  const isAria = m.from === 'aria';
+  const senderName = isLead ? '' : (isAria ? 'Aria' : 'You');
+  return {
+    align: isLead ? 'flex-start' : 'flex-end',
+    sender: senderName,
+    showSender: !isLead,
+    senderColor: isAria ? '#007aff' : '#34c759',
+    bubbleBg: isLead ? '#ffffff' : (isAria ? '#eef4ff' : '#34c759'),
+    bubbleColor: isLead ? '#1d1d1f' : (isAria ? '#16306b' : '#ffffff'),
+    bubbleBorder: isLead ? '1px solid #e9e9ec' : 'none',
+    radius: isLead ? '4px 14px 14px 14px' : '14px 4px 14px 14px',
+    text: m.text,
+    time: m.time,
+    reasoning: m.reasoning || ''
+  };
+}
+
+/* ---------- app ---------- */
+
+function App() {
+  const [state, setState] = useState({
+    screen: 'dashboard',
+    selectedId: 'l1',
+    filter: 'all',
+    aiOn: true,
+    draft: '',
+    threads: null
+  });
+  const set = patch => setState(s => ({ ...s, ...patch }));
+
+  function decorate(ld, i) {
+    const sm = statusMap(ld.status);
+    const av = avatarPalette(i);
+    return Object.assign({}, ld, {
+      statusColor: sm.color, statusBg: sm.bg, statusLabel: sm.label,
+      avatarBg: av[0], avatarColor: av[1],
+      initials: initials(ld.name),
+      scorePct: ld.score + '%',
+      gaugeGradient: 'conic-gradient(' + sm.color + ' ' + (ld.score * 3.6) + 'deg, #eaeaee 0deg)',
+      onClick: () => set({ screen: 'detail', selectedId: ld.id, aiOn: true, draft: '' })
+    });
+  }
+
+  function getThread(ld) {
+    if (state.threads && state.threads[ld.id]) return state.threads[ld.id];
+    if (ld.thread) return ld.thread;
+    return [
+      {from:'aria',text:'Hi ' + ld.name.split(' ')[0] + '! I’m Aria. I saw your interest in homes around ' + ld.location + ' — what budget range are you working with?',time:'2d ago'},
+      {from:'lead',text:'Hi! Still figuring that out, just starting to look around.',time:'2d ago'},
+      {from:'aria',text:'No problem at all — I’ll send a few options across price points so you can get a feel for the market. Any must-haves like bedrooms or a yard?',time:'2d ago',reasoning:'Early-stage lead. Keeping it low-pressure while gathering must-haves to refine scoring.'}
+    ];
+  }
+
+  function send() {
+    if (state.aiOn) return;
+    const text = state.draft.trim();
+    if (!text) return;
+    const sel = leadsData().find(l => l.id === state.selectedId);
+    const base = (state.threads && state.threads[state.selectedId]) || getThread(decorate(sel, 0));
+    const next = base.concat([{ from:'agent', text, time:'now' }]);
+    const threads = Object.assign({}, state.threads, { [state.selectedId]: next });
+    set({ threads, draft: '' });
+  }
+
+  /* ----- derived values (renderVals) ----- */
+  const v = useMemo(() => {
+    const raw = leadsData();
+    const leads = raw.map((l, i) => decorate(l, i));
+    const byId = {};
+    leads.forEach(l => byId[l.id] = l);
+    const sel = byId[state.selectedId] || leads[0];
+
+    const counts = {
+      all: leads.length,
+      hot: leads.filter(l => l.status === 'hot').length,
+      warm: leads.filter(l => l.status === 'warm').length,
+      cold: leads.filter(l => l.status === 'cold').length,
+      needs: leads.filter(l => l.needsReply).length
+    };
+
+    const segDefs = [
+      {key:'all',label:'All leads',dot:'#c7c7cc',count:counts.all},
+      {key:'needs',label:'Needs reply',dot:'#007aff',count:counts.needs},
+      {key:'hot',label:'Hot',dot:'#34c759',count:counts.hot},
+      {key:'warm',label:'Warm',dot:'#f5a623',count:counts.warm},
+      {key:'cold',label:'Cold',dot:'#c7c7cc',count:counts.cold}
+    ];
+    const segments = segDefs.map(s => {
+      const active = state.filter === s.key;
+      return Object.assign({}, s, {
+        onClick: () => set({ filter: s.key }),
+        rowStyle: 'display:flex; align-items:center; justify-content:space-between; padding:8px 8px; font-size:12.5px; font-weight:' + (active?'600':'500') + '; color:' + (active?'#1d1d1f':'#48484a') + '; background:' + (active?'#eef0f3':'transparent') + '; border-radius:7px; cursor:pointer; margin-bottom:1px;'
+      });
+    });
+
+    let visibleLeads = leads;
+    const f = state.filter;
+    if (f === 'needs') visibleLeads = leads.filter(l => l.needsReply);
+    else if (f === 'hot' || f === 'warm' || f === 'cold') visibleLeads = leads.filter(l => l.status === f);
+
+    const sources = [
+      {label:'Zillow',count:3},{label:'WhatsApp',count:2},{label:'Website Form',count:2},
+      {label:'Facebook Ad',count:2},{label:'Realtor.com',count:1}
+    ];
+
+    const stats = [
+      {label:'Hot',value:counts.hot,delta:'+2',deltaColor:'#1fae54',dot:'#34c759'},
+      {label:'Warm',value:counts.warm,delta:'+1',deltaColor:'#1fae54',dot:'#f5a623'},
+      {label:'Cold',value:counts.cold,delta:'−1',deltaColor:'#86868b',dot:'#c7c7cc'},
+      {label:'Needs reply',value:counts.needs,delta:'now',deltaColor:'#007aff',dot:'#007aff'}
+    ];
+
+    const suggestions = [
+      {accent:'#34c759',title:'Marcus Chen wants a Saturday tour',body:'Hot lead, pre-approved at $1.4M. Confirm the time before a competitor does.',onClick:()=>set({screen:'detail',selectedId:'l1',aiOn:true,draft:''})},
+      {accent:'#34c759',title:'Lisa Wong requested a 2nd viewing',body:'La Jolla home. She’s signaling strong buying intent — worth a personal call.',onClick:()=>set({screen:'detail',selectedId:'l4',aiOn:true,draft:''})},
+      {accent:'#f5a623',title:'Anthony Russo is comparing areas',body:'Aria is nurturing, but a neighborhood guide from you could tip him hot.',onClick:()=>set({screen:'detail',selectedId:'l5',aiOn:true,draft:''})}
+    ];
+
+    const thread = getThread(sel);
+    const messages = thread.map(m => decorateMsg(m));
+    const suggestedReplies = (sel.suggested || [
+      'Happy to help you narrow things down — want me to set up a quick call this week?',
+      'I can send a tailored shortlist for ' + sel.location + '. Should I focus on a particular neighborhood?'
+    ]).map(t => ({ text:t, onClick: () => set({ aiOn:false, draft:t }) }));
+
+    const aiOn = state.aiOn;
+
+    const talkingPoints = sel.talkingPoints || [
+      'Lead is still early-stage — focus on building rapport over closing.',
+      'Confirm budget and timeline, which Aria hasn’t fully captured yet.',
+      'Offer a curated shortlist for ' + sel.location + ' to re-engage.'
+    ];
+    const recap = thread.slice(-3).map(m => {
+      const d = decorateMsg(m);
+      return { align:d.align, sender: m.from==='lead'? sel.name.split(' ')[0] : d.sender, senderColor:d.senderColor, bubbleBg:d.bubbleBg, bubbleColor:d.bubbleColor, bubbleBorder:d.bubbleBorder, text:d.text };
+    });
+
+    const navInboxStyle = 'width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; color:' + (state.screen==='dashboard'?'#007aff':'#86868b') + '; background:' + (state.screen==='dashboard'?'#e8f0fe':'transparent') + '; cursor:pointer;';
+
+    const composerDisabled = aiOn;
+    return {
+      isDashboard: state.screen === 'dashboard',
+      isDetail: state.screen === 'detail',
+      isHandoff: state.screen === 'handoff',
+      navInboxStyle,
+      segments, sources, stats, visibleLeads, suggestions,
+      briefing: 'Good morning, Jordan. You have ' + counts.hot + ' hot leads waiting — Marcus Chen and Lisa Wong both want tours this weekend. I qualified 47 new leads overnight and moved 3 from warm to hot. Marcus is your highest-priority reply right now.',
+      sel,
+      messages, suggestedReplies, aiOn,
+      talkingPoints, recap,
+      draft: state.draft,
+      composerBg: aiOn ? '#f7f7f9' : '#ffffff',
+      composerBorder: aiOn ? '#ededf0' : '#cfd8e8',
+      composerPlaceholder: aiOn ? 'Aria is handling this conversation — switch to “You handle” to type' : 'Type your reply to ' + sel.name.split(' ')[0] + '…',
+      composerDisabled,
+      sendBtnStyle: 'width:34px; height:34px; flex:none; border-radius:9px; display:flex; align-items:center; justify-content:center; color:#fff; background:' + ((!aiOn && state.draft.trim()) ? '#007aff' : '#c7c7cc') + '; cursor:' + ((!aiOn && state.draft.trim()) ? 'pointer' : 'default') + ';',
+      aiTabStyle: 'display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; padding:6px 11px; border-radius:7px; cursor:pointer; color:' + (aiOn?'#1d1d1f':'#86868b') + '; background:' + (aiOn?'#fff':'transparent') + '; box-shadow:' + (aiOn?'0 1px 2px rgba(0,0,0,0.08)':'none') + ';',
+      humanTabStyle: 'font-size:12px; font-weight:600; padding:6px 11px; border-radius:7px; cursor:pointer; color:' + (!aiOn?'#1d1d1f':'#86868b') + '; background:' + (!aiOn?'#fff':'transparent') + '; box-shadow:' + (!aiOn?'0 1px 2px rgba(0,0,0,0.08)':'none') + ';'
+    };
+  }, [state]);
+
+  const goDashboard = () => set({ screen: 'dashboard' });
+  const openHandoff = () => set({ screen: 'handoff' });
+  const backToDetail = () => set({ screen: 'detail' });
+  const acceptHandoff = () => set({ screen: 'detail', aiOn: false });
+  const onKey = e => { if (e.key === 'Enter') send(); };
+
+  return (
+    <div style={st('height:100vh; width:100vw; display:flex; overflow:hidden; background:#f5f5f7;')}>
+
+      {/* ICON NAV RAIL */}
+      <div style={st('width:60px; flex:none; background:#fbfbfd; border-right:1px solid #e9e9ec; display:flex; flex-direction:column; align-items:center; padding:14px 0; gap:4px;')}>
+        <div style={st('width:30px; height:30px; border-radius:9px; background:#007aff; display:flex; align-items:center; justify-content:center; margin-bottom:14px; box-shadow:0 2px 6px rgba(0,122,255,0.35);')}>
+          <div style={st('width:11px; height:11px; border-radius:50%; background:#fff;')}></div>
+        </div>
+        <div onClick={goDashboard} title="Inbox" style={st(v.navInboxStyle)}><Icon html={ICONS.inbox} /></div>
+        <div title="Pipeline" style={st('width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#86868b; cursor:pointer;')}><Icon html={ICONS.pipeline} /></div>
+        <div title="Automations" style={st('width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#86868b; cursor:pointer;')}><Icon html={ICONS.automations} /></div>
+        <div title="Analytics" style={st('width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#86868b; cursor:pointer;')}><Icon html={ICONS.analytics} /></div>
+        <div style={st('flex:1;')}></div>
+        <div title="Settings" style={st('width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#86868b; cursor:pointer;')}><Icon html={ICONS.settings} /></div>
+        <div style={st('width:30px; height:30px; border-radius:50%; background:#1d1d1f; color:#fff; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; margin-top:8px;')}>JA</div>
+      </div>
+
+      {/* ================= DASHBOARD ================= */}
+      {v.isDashboard && (
+      <div style={st('flex:1; display:flex; min-width:0;')}>
+
+        {/* SEGMENTS SIDEBAR */}
+        <div style={st('width:232px; flex:none; background:#fbfbfd; border-right:1px solid #e9e9ec; display:flex; flex-direction:column; padding:16px 12px;')}>
+          <div style={st('display:flex; align-items:center; gap:8px; padding:0 8px 14px;')}>
+            <span style={st('font-size:15px; font-weight:700; letter-spacing:-0.02em;')}>Lumen</span>
+            <span style={st('font-size:9px; font-weight:700; color:#007aff; background:rgba(0,122,255,0.1); padding:2px 6px; border-radius:5px; letter-spacing:0.02em;')}>AI</span>
+          </div>
+          <div style={st('font-size:10.5px; font-weight:600; color:#a1a1a6; text-transform:uppercase; letter-spacing:0.06em; padding:6px 8px;')}>Views</div>
+          {v.segments.map(seg => (
+            <Box key={seg.key} onClick={seg.onClick} style={seg.rowStyle}>
+              <span style={st('display:flex; align-items:center; gap:9px;')}>
+                <span style={st(`width:7px; height:7px; border-radius:50%; background:${seg.dot};`)}></span>
+                {seg.label}
+              </span>
+              <span style={st('font-size:11px; color:#a1a1a6; font-variant-numeric:tabular-nums;')}>{seg.count}</span>
+            </Box>
+          ))}
+          <div style={st('height:1px; background:#e9e9ec; margin:14px 8px;')}></div>
+          <div style={st('font-size:10.5px; font-weight:600; color:#a1a1a6; text-transform:uppercase; letter-spacing:0.06em; padding:6px 8px;')}>Sources</div>
+          {v.sources.map(src => (
+            <Box key={src.label} style={'display:flex; align-items:center; justify-content:space-between; padding:7px 8px; font-size:12.5px; color:#48484a; border-radius:7px; cursor:pointer;'} hover={'background:#f0f0f3;'}>
+              <span>{src.label}</span>
+              <span style={st('font-size:11px; color:#a1a1a6; font-variant-numeric:tabular-nums;')}>{src.count}</span>
+            </Box>
+          ))}
+          <div style={st('flex:1;')}></div>
+          <div style={st('display:flex; align-items:center; gap:8px; padding:9px 10px; background:#f0f0f3; border-radius:10px;')}>
+            <span style={st('width:6px; height:6px; border-radius:50%; background:#34c759; animation:lumenPulse 2s ease infinite;')}></span>
+            <span style={st('font-size:11.5px; color:#48484a; font-weight:500;')}>Aria is online</span>
+          </div>
+        </div>
+
+        {/* MAIN LIST AREA */}
+        <div style={st('flex:1; min-width:0; display:flex; flex-direction:column; background:#ffffff;')}>
+          {/* top bar */}
+          <div style={st('height:56px; flex:none; border-bottom:1px solid #ededf0; display:flex; align-items:center; padding:0 22px; gap:16px;')}>
+            <div style={st('display:flex; flex-direction:column;')}>
+              <span style={st('font-size:16px; font-weight:600; letter-spacing:-0.02em;')}>Lead Inbox</span>
+            </div>
+            <div style={st('flex:1;')}></div>
+            <div style={st('display:flex; align-items:center; gap:7px; background:#f5f5f7; border-radius:9px; padding:7px 11px; width:240px;')}>
+              <Icon html={ICONS.search} />
+              <span style={st('font-size:12.5px; color:#a1a1a6;')}>Search leads</span>
+              <span style={st('flex:1;')}></span>
+              <span style={st('font-size:11px; color:#c7c7cc; border:1px solid #e0e0e4; border-radius:4px; padding:1px 5px;')}>⌘K</span>
+            </div>
+            <div style={st('display:flex; align-items:center; gap:6px; background:#007aff; color:#fff; padding:8px 13px; border-radius:9px; font-size:12.5px; font-weight:600; cursor:pointer; box-shadow:0 1px 3px rgba(0,122,255,0.3);')}>
+              <Icon html={ICONS.plus} />
+              New lead
+            </div>
+          </div>
+
+          {/* stat tiles */}
+          <div style={st('display:flex; gap:12px; padding:16px 22px 4px;')}>
+            {v.stats.map(stx => (
+              <div key={stx.label} style={st('flex:1; border:1px solid #ededf0; border-radius:12px; padding:13px 15px; display:flex; flex-direction:column; gap:6px; background:#fff;')}>
+                <span style={st('font-size:11.5px; color:#86868b; font-weight:500; display:flex; align-items:center; gap:6px;')}>
+                  <span style={st(`width:7px; height:7px; border-radius:50%; background:${stx.dot};`)}></span>{stx.label}
+                </span>
+                <div style={st('display:flex; align-items:baseline; gap:7px;')}>
+                  <span style={st('font-size:24px; font-weight:600; letter-spacing:-0.03em; font-variant-numeric:tabular-nums;')}>{stx.value}</span>
+                  <span style={st(`font-size:11.5px; font-weight:600; color:${stx.deltaColor};`)}>{stx.delta}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* list header */}
+          <div style={st('display:flex; align-items:center; padding:14px 22px 8px; gap:14px; font-size:10.5px; font-weight:600; color:#a1a1a6; text-transform:uppercase; letter-spacing:0.05em;')}>
+            <span style={st('width:230px;')}>Lead</span>
+            <span style={st('width:96px;')}>Status</span>
+            <span style={st('width:120px;')}>Score</span>
+            <span style={st('flex:1;')}>Latest activity</span>
+            <span style={st('width:62px; text-align:right;')}>When</span>
+          </div>
+          <div style={st('height:1px; background:#ededf0; margin:0 22px;')}></div>
+
+          {/* rows */}
+          <div style={st('flex:1; overflow-y:auto; padding:4px 12px 16px;')}>
+            {v.visibleLeads.map(ld => (
+              <Box key={ld.id} onClick={ld.onClick} style={'display:flex; align-items:center; gap:14px; padding:11px 10px; border-radius:10px; cursor:pointer; border-bottom:1px solid #f4f4f6;'} hover={'background:#f7f9fc;'}>
+                {/* lead */}
+                <div style={st(`width:230px; display:flex; align-items:center; gap:11px; min-width:0;`)}>
+                  <div style={st(`width:34px; height:34px; flex:none; border-radius:50%; background:${ld.avatarBg}; color:${ld.avatarColor}; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600;`)}>{ld.initials}</div>
+                  <div style={st('min-width:0;')}>
+                    <div style={st('font-size:13.5px; font-weight:600; letter-spacing:-0.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;')}>{ld.name}</div>
+                    <div style={st('font-size:11.5px; color:#a1a1a6; display:flex; align-items:center; gap:5px; white-space:nowrap;')}>{ld.source} · {ld.location}</div>
+                  </div>
+                </div>
+                {/* status */}
+                <div style={st('width:96px;')}>
+                  <span style={st(`font-size:10.5px; font-weight:700; letter-spacing:0.04em; color:${ld.statusColor}; background:${ld.statusBg}; padding:4px 9px; border-radius:6px;`)}>{ld.statusLabel}</span>
+                </div>
+                {/* score */}
+                <div style={st('width:120px; display:flex; align-items:center; gap:9px;')}>
+                  <div style={st('flex:1; height:5px; background:#eeeef1; border-radius:3px; overflow:hidden;')}>
+                    <div style={st(`height:100%; width:${ld.scorePct}; background:${ld.statusColor}; border-radius:3px;`)}></div>
+                  </div>
+                  <span style={st('font-size:12px; font-weight:600; color:#48484a; font-variant-numeric:tabular-nums; width:20px;')}>{ld.score}</span>
+                </div>
+                {/* activity */}
+                <div style={st('flex:1; min-width:0; display:flex; align-items:center; gap:8px;')}>
+                  {ld.byAria && (
+                    <span style={st('font-size:9.5px; font-weight:700; color:#007aff; background:rgba(0,122,255,0.09); padding:2px 6px; border-radius:5px; flex:none;')}>ARIA</span>
+                  )}
+                  <span style={st('font-size:12.5px; color:#6e6e73; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;')}>{ld.snippet}</span>
+                </div>
+                {/* when */}
+                <div style={st('width:62px; text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:3px;')}>
+                  <span style={st('font-size:11.5px; color:#a1a1a6; font-variant-numeric:tabular-nums;')}>{ld.time}</span>
+                  {ld.needsReply && (
+                    <span style={st('width:6px; height:6px; border-radius:50%; background:#007aff;')}></span>
+                  )}
+                </div>
+              </Box>
+            ))}
+          </div>
+        </div>
+
+        {/* AI INSIGHTS PANEL */}
+        <div style={st('width:328px; flex:none; background:#fbfbfd; border-left:1px solid #e9e9ec; display:flex; flex-direction:column; overflow-y:auto;')}>
+          <div style={st('padding:18px 18px 14px; border-bottom:1px solid #ededf0;')}>
+            <div style={st('display:flex; align-items:center; gap:10px;')}>
+              <div style={st('width:32px; height:32px; border-radius:10px; background:linear-gradient(135deg,#0a84ff,#0040dd); display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,122,255,0.3);')}>
+                <div style={st('width:12px; height:12px; border-radius:50%; border:2.5px solid #fff;')}></div>
+              </div>
+              <div>
+                <div style={st('font-size:13.5px; font-weight:700; letter-spacing:-0.01em;')}>Aria</div>
+                <div style={st('font-size:11px; color:#86868b;')}>Your AI lead assistant</div>
+              </div>
+            </div>
+          </div>
+
+          <div style={st('padding:16px 18px;')}>
+            <div style={st('font-size:10.5px; font-weight:600; color:#a1a1a6; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:9px;')}>Morning briefing</div>
+            <div style={st('font-size:13px; line-height:1.55; color:#3a3a3c;')}>{v.briefing}</div>
+          </div>
+
+          <div style={st('padding:0 18px 16px;')}>
+            <div style={st('font-size:10.5px; font-weight:600; color:#a1a1a6; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:10px;')}>Needs your attention</div>
+            {v.suggestions.map((sg, idx) => (
+              <Box key={idx} onClick={sg.onClick} style={'display:flex; gap:11px; padding:12px; border:1px solid #ededf0; border-radius:12px; margin-bottom:9px; cursor:pointer; background:#fff;'} hover={'border-color:#d2d2d7; background:#fafafd;'}>
+                <div style={st(`width:6px; flex:none; border-radius:3px; background:${sg.accent};`)}></div>
+                <div style={st('min-width:0;')}>
+                  <div style={st('font-size:12.5px; font-weight:600; margin-bottom:3px;')}>{sg.title}</div>
+                  <div style={st('font-size:11.5px; color:#86868b; line-height:1.45;')}>{sg.body}</div>
+                </div>
+              </Box>
+            ))}
+          </div>
+
+          <div style={st('padding:0 18px 22px;')}>
+            <div style={st('font-size:10.5px; font-weight:600; color:#a1a1a6; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:10px;')}>Today, handled by Aria</div>
+            <div style={st('display:flex; gap:10px;')}>
+              <div style={st('flex:1; border:1px solid #ededf0; border-radius:11px; padding:12px; background:#fff;')}>
+                <div style={st('font-size:21px; font-weight:600; letter-spacing:-0.03em;')}>47</div>
+                <div style={st('font-size:11px; color:#86868b; margin-top:2px;')}>Leads qualified</div>
+              </div>
+              <div style={st('flex:1; border:1px solid #ededf0; border-radius:11px; padding:12px; background:#fff;')}>
+                <div style={st('font-size:21px; font-weight:600; letter-spacing:-0.03em;')}>12m</div>
+                <div style={st('font-size:11px; color:#86868b; margin-top:2px;')}>Avg response</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      )}
+
+      {/* ================= LEAD DETAIL ================= */}
+      {v.isDetail && (
+      <div style={st('flex:1; display:flex; min-width:0;')}>
+
+        {/* LEFT: profile / score / intent / timeline */}
+        <div style={st('width:344px; flex:none; background:#fbfbfd; border-right:1px solid #e9e9ec; display:flex; flex-direction:column; overflow-y:auto;')}>
+          <div style={st('padding:14px 18px; display:flex; align-items:center; gap:8px; border-bottom:1px solid #ededf0;')}>
+            <Box onClick={goDashboard} style={'display:flex; align-items:center; gap:5px; color:#86868b; font-size:12.5px; font-weight:500; cursor:pointer;'} hover={'color:#1d1d1f;'}>
+              <Icon html={ICONS.back} />
+              Inbox
+            </Box>
+          </div>
+
+          <div style={st('padding:22px 18px 16px; display:flex; flex-direction:column; align-items:center; text-align:center; border-bottom:1px solid #ededf0;')}>
+            <div style={st(`width:60px; height:60px; border-radius:50%; background:${v.sel.avatarBg}; color:${v.sel.avatarColor}; display:flex; align-items:center; justify-content:center; font-size:21px; font-weight:600; margin-bottom:12px;`)}>{v.sel.initials}</div>
+            <div style={st('font-size:18px; font-weight:600; letter-spacing:-0.02em;')}>{v.sel.name}</div>
+            <div style={st('font-size:12.5px; color:#86868b; margin-top:3px;')}>{v.sel.source} · {v.sel.location}</div>
+            <div style={st('display:flex; gap:8px; margin-top:14px;')}>
+              <div style={st('display:flex; align-items:center; gap:5px; background:#fff; border:1px solid #e6e6ea; padding:6px 11px; border-radius:8px; font-size:12px; font-weight:500; color:#48484a; cursor:pointer;')}>
+                <Icon html={ICONS.email} />Email
+              </div>
+              <div style={st('display:flex; align-items:center; gap:5px; background:#fff; border:1px solid #e6e6ea; padding:6px 11px; border-radius:8px; font-size:12px; font-weight:500; color:#48484a; cursor:pointer;')}>
+                <Icon html={ICONS.call} />Call
+              </div>
+            </div>
+          </div>
+
+          {/* score gauge */}
+          <div style={st('padding:18px; border-bottom:1px solid #ededf0; display:flex; align-items:center; gap:16px;')}>
+            <div style={st(`width:74px; height:74px; flex:none; border-radius:50%; background:${v.sel.gaugeGradient}; display:flex; align-items:center; justify-content:center;`)}>
+              <div style={st('width:58px; height:58px; border-radius:50%; background:#fbfbfd; display:flex; flex-direction:column; align-items:center; justify-content:center;')}>
+                <span style={st(`font-size:21px; font-weight:600; letter-spacing:-0.03em; color:${v.sel.statusColor};`)}>{v.sel.score}</span>
+                <span style={st('font-size:9px; color:#a1a1a6; font-weight:600; letter-spacing:0.05em;')}>SCORE</span>
+              </div>
+            </div>
+            <div>
+              <span style={st(`font-size:10.5px; font-weight:700; letter-spacing:0.04em; color:${v.sel.statusColor}; background:${v.sel.statusBg}; padding:4px 9px; border-radius:6px;`)}>{v.sel.statusLabel} LEAD</span>
+              <div style={st('font-size:12px; color:#6e6e73; line-height:1.45; margin-top:9px;')}>{v.sel.scoreReason}</div>
+            </div>
+          </div>
+
+          {/* qualification facts */}
+          <div style={st('padding:16px 18px; border-bottom:1px solid #ededf0;')}>
+            <div style={st('font-size:10.5px; font-weight:600; color:#a1a1a6; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:11px;')}>Qualification</div>
+            {(v.sel.facts || []).map((f, idx) => (
+              <div key={idx} style={st('display:flex; justify-content:space-between; align-items:center; padding:6px 0;')}>
+                <span style={st('font-size:12.5px; color:#86868b;')}>{f.label}</span>
+                <span style={st('font-size:12.5px; font-weight:600; color:#1d1d1f;')}>{f.value}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* AI intent summary */}
+          <div style={st('padding:16px 18px; border-bottom:1px solid #ededf0;')}>
+            <div style={st('display:flex; align-items:center; gap:7px; margin-bottom:10px;')}>
+              <span style={st('font-size:9.5px; font-weight:700; color:#007aff; background:rgba(0,122,255,0.09); padding:2px 6px; border-radius:5px;')}>ARIA</span>
+              <span style={st('font-size:10.5px; font-weight:600; color:#a1a1a6; text-transform:uppercase; letter-spacing:0.05em;')}>Intent summary</span>
+            </div>
+            <div style={st('font-size:12.5px; line-height:1.55; color:#3a3a3c;')}>{v.sel.intentSummary}</div>
+          </div>
+
+          {/* timeline */}
+          <div style={st('padding:16px 18px 24px;')}>
+            <div style={st('font-size:10.5px; font-weight:600; color:#a1a1a6; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:14px;')}>Timeline</div>
+            {(v.sel.timeline || []).map((tl, idx) => (
+              <div key={idx} style={st('display:flex; gap:11px; padding-bottom:16px; position:relative;')}>
+                <div style={st('display:flex; flex-direction:column; align-items:center; flex:none;')}>
+                  <span style={st(`width:9px; height:9px; border-radius:50%; background:${tl.dot}; border:2px solid #fbfbfd; box-shadow:0 0 0 1px ${tl.dot}; margin-top:3px;`)}></span>
+                  <span style={st('flex:1; width:1px; background:#e6e6ea; margin-top:4px;')}></span>
+                </div>
+                <div style={st('min-width:0; padding-bottom:2px;')}>
+                  <div style={st('font-size:12.5px; font-weight:600; color:#1d1d1f;')}>{tl.title}</div>
+                  <div style={st('font-size:11.5px; color:#86868b; line-height:1.45; margin-top:2px;')}>{tl.detail}</div>
+                  <div style={st('font-size:11px; color:#b0b0b5; margin-top:4px;')}>{tl.time}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* CENTER: conversation */}
+        <div style={st('flex:1; min-width:0; display:flex; flex-direction:column; background:#ffffff;')}>
+          {/* conversation header */}
+          <div style={st('height:56px; flex:none; border-bottom:1px solid #ededf0; display:flex; align-items:center; padding:0 22px; gap:12px;')}>
+            <div style={st('display:flex; flex-direction:column;')}>
+              <span style={st('font-size:14.5px; font-weight:600; letter-spacing:-0.01em;')}>Conversation</span>
+              <span style={st('font-size:11px; color:#86868b;')}>WhatsApp · started 3 days ago</span>
+            </div>
+            <div style={st('flex:1;')}></div>
+            {/* AI mode toggle */}
+            <div style={st('display:flex; align-items:center; background:#f0f0f3; border-radius:9px; padding:3px;')}>
+              <div onClick={() => set({ aiOn: true })} style={st(v.aiTabStyle)}>
+                <span style={st('width:6px; height:6px; border-radius:50%; background:#34c759;')}></span> Aria handling
+              </div>
+              <div onClick={() => set({ aiOn: false })} style={st(v.humanTabStyle)}>You handle</div>
+            </div>
+            <div onClick={openHandoff} style={st('display:flex; align-items:center; gap:6px; background:#007aff; color:#fff; padding:8px 13px; border-radius:9px; font-size:12.5px; font-weight:600; cursor:pointer; box-shadow:0 1px 3px rgba(0,122,255,0.3);')}>
+              <Icon html={ICONS.arrow} />
+              Hand off to me
+            </div>
+          </div>
+
+          {/* messages */}
+          <div style={st('flex:1; overflow-y:auto; padding:22px 26px; display:flex; flex-direction:column; gap:14px; background:#fcfcfd;')}>
+            {v.messages.map((m, idx) => (
+              <div key={idx} style={st(`display:flex; flex-direction:column; align-items:${m.align}; max-width:100%;`)}>
+                {m.showSender && (
+                  <div style={st('display:flex; align-items:center; gap:6px; margin-bottom:5px; padding:0 4px;')}>
+                    <span style={st(`font-size:10.5px; font-weight:700; color:${m.senderColor};`)}>{m.sender}</span>
+                    <span style={st('font-size:10.5px; color:#b0b0b5;')}>{m.time}</span>
+                  </div>
+                )}
+                <div style={st(`max-width:70%; background:${m.bubbleBg}; color:${m.bubbleColor}; border:${m.bubbleBorder}; padding:10px 14px; border-radius:${m.radius}; font-size:13px; line-height:1.5;`)}>{m.text}</div>
+                {m.reasoning && (
+                  <div style={st('max-width:70%; display:flex; gap:7px; margin-top:6px; padding:8px 11px; background:rgba(0,122,255,0.05); border-radius:9px;')}>
+                    <Icon html={ICONS.info} />
+                    <span style={st('font-size:11.5px; color:#5a6b85; line-height:1.45;')}>{m.reasoning}</span>
+                  </div>
+                )}
+              </div>
+            ))}
+            {v.aiOn && (
+              <div style={st('display:flex; align-items:center; gap:8px; padding:4px;')}>
+                <span style={st('font-size:10.5px; font-weight:700; color:#007aff;')}>Aria</span>
+                <div style={st('display:flex; gap:3px; align-items:center; background:#eef4ff; padding:8px 11px; border-radius:12px;')}>
+                  <span style={st('width:5px; height:5px; border-radius:50%; background:#007aff; animation:lumenDot 1.2s infinite;')}></span>
+                  <span style={st('width:5px; height:5px; border-radius:50%; background:#007aff; animation:lumenDot 1.2s infinite 0.2s;')}></span>
+                  <span style={st('width:5px; height:5px; border-radius:50%; background:#007aff; animation:lumenDot 1.2s infinite 0.4s;')}></span>
+                </div>
+                <span style={st('font-size:11px; color:#a1a1a6;')}>Aria is monitoring this thread</span>
+              </div>
+            )}
+          </div>
+
+          {/* composer */}
+          <div style={st('flex:none; border-top:1px solid #ededf0; padding:14px 26px 18px; background:#fff;')}>
+            {v.aiOn && (
+              <div style={st('margin-bottom:11px;')}>
+                <div style={st('font-size:11px; color:#86868b; margin-bottom:8px; display:flex; align-items:center; gap:6px;')}>
+                  <span style={st('font-size:9.5px; font-weight:700; color:#007aff; background:rgba(0,122,255,0.09); padding:2px 6px; border-radius:5px;')}>ARIA</span>
+                  suggested replies — click to take over with one
+                </div>
+                <div style={st('display:flex; gap:8px; flex-wrap:wrap;')}>
+                  {v.suggestedReplies.map((sr, idx) => (
+                    <Box key={idx} onClick={sr.onClick} style={'font-size:12px; color:#1d4ed8; background:#eef4ff; border:1px solid #d8e6ff; padding:8px 12px; border-radius:9px; cursor:pointer; line-height:1.4; max-width:340px;'} hover={'background:#e2edff;'}>{sr.text}</Box>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div style={st(`display:flex; align-items:flex-end; gap:10px; background:${v.composerBg}; border:1px solid ${v.composerBorder}; border-radius:13px; padding:9px 9px 9px 14px;`)}>
+              <input
+                value={v.draft}
+                onChange={e => set({ draft: e.target.value })}
+                onKeyDown={onKey}
+                placeholder={v.composerPlaceholder}
+                disabled={v.composerDisabled}
+                style={st('flex:1; border:none; outline:none; background:transparent; font-size:13px; color:#1d1d1f; padding:6px 0;')}
+              />
+              <div onClick={send} style={st(v.sendBtnStyle)}><Icon html={ICONS.send} /></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      )}
+
+      {/* ================= HANDOFF ================= */}
+      {v.isHandoff && (
+      <div style={st('flex:1; display:flex; flex-direction:column; min-width:0; background:#f5f5f7; overflow-y:auto;')}>
+        <div style={st('height:56px; flex:none; display:flex; align-items:center; padding:0 22px; gap:8px; background:#fbfbfd; border-bottom:1px solid #e9e9ec;')}>
+          <Box onClick={backToDetail} style={'display:flex; align-items:center; gap:5px; color:#86868b; font-size:12.5px; font-weight:500; cursor:pointer;'} hover={'color:#1d1d1f;'}>
+            <Icon html={ICONS.back} />
+            Conversation
+          </Box>
+        </div>
+
+        <div style={st('flex:1; display:flex; justify-content:center; padding:36px 24px;')}>
+          <div style={st('width:680px; max-width:100%;')}>
+            {/* header card */}
+            <div style={st('background:#fff; border:1px solid #ededf0; border-radius:18px; padding:26px 28px; box-shadow:0 1px 3px rgba(0,0,0,0.04); display:flex; align-items:center; gap:18px;')}>
+              <div style={st('width:48px; height:48px; flex:none; border-radius:13px; background:linear-gradient(135deg,#0a84ff,#0040dd); display:flex; align-items:center; justify-content:center; box-shadow:0 3px 10px rgba(0,122,255,0.32);')}>
+                <div style={st('width:18px; height:18px; border-radius:50%; border:3px solid #fff;')}></div>
+              </div>
+              <div style={st('flex:1;')}>
+                <div style={st('font-size:19px; font-weight:600; letter-spacing:-0.02em;')}>Aria is handing off {v.sel.name} to you</div>
+                <div style={st('font-size:13px; color:#6e6e73; margin-top:4px; line-height:1.5;')}>This lead just crossed the hot threshold. Here's everything you need before you step in.</div>
+              </div>
+              <div style={st('text-align:center; flex:none;')}>
+                <div style={st(`font-size:30px; font-weight:600; letter-spacing:-0.03em; color:${v.sel.statusColor};`)}>{v.sel.score}</div>
+                <div style={st('font-size:10px; color:#a1a1a6; font-weight:600; letter-spacing:0.05em;')}>LEAD SCORE</div>
+              </div>
+            </div>
+
+            {/* snapshot grid */}
+            <div style={st('display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px;')}>
+              {(v.sel.facts || []).map((f, idx) => (
+                <div key={idx} style={st('background:#fff; border:1px solid #ededf0; border-radius:13px; padding:14px 16px;')}>
+                  <div style={st('font-size:11px; color:#a1a1a6; font-weight:500;')}>{f.label}</div>
+                  <div style={st('font-size:15px; font-weight:600; margin-top:4px; letter-spacing:-0.01em;')}>{f.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* intent summary */}
+            <div style={st('background:#fff; border:1px solid #ededf0; border-radius:16px; padding:20px 22px; margin-top:14px;')}>
+              <div style={st('display:flex; align-items:center; gap:7px; margin-bottom:11px;')}>
+                <span style={st('font-size:9.5px; font-weight:700; color:#007aff; background:rgba(0,122,255,0.09); padding:2px 6px; border-radius:5px;')}>ARIA</span>
+                <span style={st('font-size:11px; font-weight:600; color:#a1a1a6; text-transform:uppercase; letter-spacing:0.05em;')}>What I learned</span>
+              </div>
+              <div style={st('font-size:13.5px; line-height:1.6; color:#3a3a3c;')}>{v.sel.intentSummary}</div>
+            </div>
+
+            {/* talking points */}
+            <div style={st('background:#fff; border:1px solid #ededf0; border-radius:16px; padding:20px 22px; margin-top:14px;')}>
+              <div style={st('font-size:11px; font-weight:600; color:#a1a1a6; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:14px;')}>Suggested talking points</div>
+              {v.talkingPoints.map((tp, idx) => (
+                <div key={idx} style={st('display:flex; gap:11px; align-items:flex-start; padding:7px 0;')}>
+                  <Icon html={ICONS.check} />
+                  <span style={st('font-size:13px; line-height:1.5; color:#3a3a3c;')}>{tp}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* recap */}
+            <div style={st('background:#fff; border:1px solid #ededf0; border-radius:16px; padding:20px 22px; margin-top:14px;')}>
+              <div style={st('font-size:11px; font-weight:600; color:#a1a1a6; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:14px;')}>Last exchange</div>
+              {v.recap.map((r, idx) => (
+                <div key={idx} style={st(`display:flex; flex-direction:column; align-items:${r.align}; margin-bottom:10px;`)}>
+                  <span style={st(`font-size:10.5px; font-weight:700; color:${r.senderColor}; margin-bottom:3px;`)}>{r.sender}</span>
+                  <div style={st(`max-width:78%; background:${r.bubbleBg}; color:${r.bubbleColor}; border:${r.bubbleBorder}; padding:9px 13px; border-radius:13px; font-size:12.5px; line-height:1.5;`)}>{r.text}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* CTAs */}
+            <div style={st('display:flex; gap:12px; margin:22px 0 12px;')}>
+              <Box onClick={acceptHandoff} style={'flex:1; text-align:center; background:#007aff; color:#fff; padding:14px; border-radius:13px; font-size:14px; font-weight:600; cursor:pointer; box-shadow:0 2px 8px rgba(0,122,255,0.32);'} hover={'background:#0066d6;'}>Accept &amp; take over conversation</Box>
+              <Box onClick={backToDetail} style={'text-align:center; background:#fff; border:1px solid #e0e0e4; color:#1d1d1f; padding:14px 20px; border-radius:13px; font-size:14px; font-weight:600; cursor:pointer;'} hover={'background:#f5f5f7;'}>Keep Aria on it</Box>
+            </div>
+          </div>
+        </div>
+      </div>
+      )}
+
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
