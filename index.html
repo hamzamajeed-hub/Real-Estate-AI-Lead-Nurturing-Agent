@@ -27,6 +27,106 @@
   @keyframes lumenFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
   @keyframes lumenDot { 0%, 60%, 100% { opacity: 0.25; } 30% { opacity: 1; } }
   @keyframes lumenPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  /* ---------- Responsive overrides (inline styles need !important) ---------- */
+  /* Tablet and below: tighten fixed sidebars */
+  @media (max-width: 1024px) {
+    [data-r="insights"] { width: 280px !important; }
+    [data-r="segments"] { width: 200px !important; }
+    [data-r="detail-profile"] { width: 300px !important; }
+  }
+
+  /* Phones / small tablets: stack everything vertically, allow scroll */
+  @media (max-width: 760px) {
+    html, body { height: auto !important; }
+
+    /* Root: column layout, natural height, vertical scroll */
+    [data-r="root"] {
+      flex-direction: column !important;
+      height: auto !important;
+      min-height: 100vh !important;
+      width: 100% !important;
+      overflow: visible !important;
+    }
+
+    /* Nav rail becomes a horizontal top bar */
+    [data-r="nav"] {
+      width: 100% !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      border-right: none !important;
+      border-bottom: 1px solid #e9e9ec !important;
+      padding: 8px 12px !important;
+      gap: 6px !important;
+      overflow-x: auto !important;
+    }
+    [data-r="nav-spacer"] { display: none !important; }
+    [data-r="nav-logo"] { margin-bottom: 0 !important; }
+    [data-r="nav-avatar"] { margin-top: 0 !important; }
+
+    /* Screen containers stack their children */
+    [data-r="screen"] {
+      flex-direction: column !important;
+      width: 100% !important;
+    }
+
+    /* Sidebars / panels go full width, natural height */
+    [data-r="segments"],
+    [data-r="insights"],
+    [data-r="detail-profile"] {
+      width: 100% !important;
+      flex: none !important;
+      border-right: none !important;
+      border-left: none !important;
+      border-bottom: 1px solid #e9e9ec !important;
+      overflow-y: visible !important;
+    }
+
+    [data-r="main"],
+    [data-r="conversation"] {
+      width: 100% !important;
+      min-height: 60vh !important;
+    }
+
+    /* Top bars: allow wrap so search + buttons don't overflow */
+    [data-r="topbar"] {
+      height: auto !important;
+      flex-wrap: wrap !important;
+      padding: 12px 16px !important;
+      gap: 10px !important;
+    }
+    [data-r="search"] { width: 100% !important; order: 3; }
+
+    /* Stat tiles wrap 2-up instead of cramming 4 across */
+    [data-r="stats"] {
+      flex-wrap: wrap !important;
+      padding: 14px 16px 4px !important;
+    }
+    [data-r="stats"] > div { flex: 1 1 calc(50% - 6px) !important; min-width: 0 !important; }
+
+    /* Lead list: hide the desktop column header, let rows reflow */
+    [data-r="list-header"], [data-r="list-divider"] { display: none !important; }
+    [data-r="list"] { padding: 4px 12px 24px !important; }
+
+    /* Lead row: keep avatar+name, drop fixed pixel column widths */
+    [data-r="row"] { flex-wrap: wrap !important; gap: 10px !important; }
+    [data-r="row-lead"] { width: auto !important; flex: 1 1 60% !important; }
+    [data-r="row-status"] { width: auto !important; }
+    [data-r="row-score"] { width: 110px !important; }
+    [data-r="row-activity"] { flex: 1 1 100% !important; }
+    [data-r="row-when"] { width: auto !important; }
+
+    /* Conversation messages: wider bubbles on narrow screens */
+    [data-r="messages"] { padding: 16px 14px !important; }
+    [data-r="messages"] div[style*="max-width: 70%"] { max-width: 88% !important; }
+    [data-r="composer"] { padding: 12px 14px 16px !important; }
+
+    /* Handoff: comfortable padding, single-column snapshot, stacked CTAs */
+    [data-r="handoff-body"] { padding: 20px 14px !important; }
+    [data-r="handoff-snapshot"] { grid-template-columns: 1fr !important; }
+    [data-r="handoff-header"] { flex-wrap: wrap !important; }
+    [data-r="handoff-ctas"] { flex-direction: column !important; }
+  }
 </style>
 </head>
 <body>
@@ -54,12 +154,13 @@ function st(cssText) {
 }
 
 // Div that supports a hover style string (mirrors the design's style-hover).
-function Box({ style, hover, onClick, title, children }) {
+function Box({ style, hover, onClick, title, children, ...rest }) {
   const [h, setH] = useState(false);
   const base = st(style);
   const merged = h && hover ? { ...base, ...st(hover) } : base;
   return (
     <div
+      {...rest}
       style={merged}
       title={title}
       onClick={onClick}
@@ -327,28 +428,28 @@ function App() {
   const onKey = e => { if (e.key === 'Enter') send(); };
 
   return (
-    <div style={st('height:100vh; width:100vw; display:flex; overflow:hidden; background:#f5f5f7;')}>
+    <div data-r="root" style={st('height:100vh; width:100vw; display:flex; overflow:hidden; background:#f5f5f7;')}>
 
       {/* ICON NAV RAIL */}
-      <div style={st('width:60px; flex:none; background:#fbfbfd; border-right:1px solid #e9e9ec; display:flex; flex-direction:column; align-items:center; padding:14px 0; gap:4px;')}>
-        <div style={st('width:30px; height:30px; border-radius:9px; background:#007aff; display:flex; align-items:center; justify-content:center; margin-bottom:14px; box-shadow:0 2px 6px rgba(0,122,255,0.35);')}>
+      <div data-r="nav" style={st('width:60px; flex:none; background:#fbfbfd; border-right:1px solid #e9e9ec; display:flex; flex-direction:column; align-items:center; padding:14px 0; gap:4px;')}>
+        <div data-r="nav-logo" style={st('width:30px; height:30px; border-radius:9px; background:#007aff; display:flex; align-items:center; justify-content:center; margin-bottom:14px; box-shadow:0 2px 6px rgba(0,122,255,0.35);')}>
           <div style={st('width:11px; height:11px; border-radius:50%; background:#fff;')}></div>
         </div>
         <div onClick={goDashboard} title="Inbox" style={st(v.navInboxStyle)}><Icon html={ICONS.inbox} /></div>
         <div title="Pipeline" style={st('width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#86868b; cursor:pointer;')}><Icon html={ICONS.pipeline} /></div>
         <div title="Automations" style={st('width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#86868b; cursor:pointer;')}><Icon html={ICONS.automations} /></div>
         <div title="Analytics" style={st('width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#86868b; cursor:pointer;')}><Icon html={ICONS.analytics} /></div>
-        <div style={st('flex:1;')}></div>
+        <div data-r="nav-spacer" style={st('flex:1;')}></div>
         <div title="Settings" style={st('width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#86868b; cursor:pointer;')}><Icon html={ICONS.settings} /></div>
-        <div style={st('width:30px; height:30px; border-radius:50%; background:#1d1d1f; color:#fff; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; margin-top:8px;')}>JA</div>
+        <div data-r="nav-avatar" style={st('width:30px; height:30px; border-radius:50%; background:#1d1d1f; color:#fff; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; margin-top:8px;')}>JA</div>
       </div>
 
       {/* ================= DASHBOARD ================= */}
       {v.isDashboard && (
-      <div style={st('flex:1; display:flex; min-width:0;')}>
+      <div data-r="screen" style={st('flex:1; display:flex; min-width:0;')}>
 
         {/* SEGMENTS SIDEBAR */}
-        <div style={st('width:232px; flex:none; background:#fbfbfd; border-right:1px solid #e9e9ec; display:flex; flex-direction:column; padding:16px 12px;')}>
+        <div data-r="segments" style={st('width:232px; flex:none; background:#fbfbfd; border-right:1px solid #e9e9ec; display:flex; flex-direction:column; padding:16px 12px;')}>
           <div style={st('display:flex; align-items:center; gap:8px; padding:0 8px 14px;')}>
             <span style={st('font-size:15px; font-weight:700; letter-spacing:-0.02em;')}>Lumen</span>
             <span style={st('font-size:9px; font-weight:700; color:#007aff; background:rgba(0,122,255,0.1); padding:2px 6px; border-radius:5px; letter-spacing:0.02em;')}>AI</span>
@@ -379,14 +480,14 @@ function App() {
         </div>
 
         {/* MAIN LIST AREA */}
-        <div style={st('flex:1; min-width:0; display:flex; flex-direction:column; background:#ffffff;')}>
+        <div data-r="main" style={st('flex:1; min-width:0; display:flex; flex-direction:column; background:#ffffff;')}>
           {/* top bar */}
-          <div style={st('height:56px; flex:none; border-bottom:1px solid #ededf0; display:flex; align-items:center; padding:0 22px; gap:16px;')}>
+          <div data-r="topbar" style={st('height:56px; flex:none; border-bottom:1px solid #ededf0; display:flex; align-items:center; padding:0 22px; gap:16px;')}>
             <div style={st('display:flex; flex-direction:column;')}>
               <span style={st('font-size:16px; font-weight:600; letter-spacing:-0.02em;')}>Lead Inbox</span>
             </div>
             <div style={st('flex:1;')}></div>
-            <div style={st('display:flex; align-items:center; gap:7px; background:#f5f5f7; border-radius:9px; padding:7px 11px; width:240px;')}>
+            <div data-r="search" style={st('display:flex; align-items:center; gap:7px; background:#f5f5f7; border-radius:9px; padding:7px 11px; width:240px;')}>
               <Icon html={ICONS.search} />
               <span style={st('font-size:12.5px; color:#a1a1a6;')}>Search leads</span>
               <span style={st('flex:1;')}></span>
@@ -399,7 +500,7 @@ function App() {
           </div>
 
           {/* stat tiles */}
-          <div style={st('display:flex; gap:12px; padding:16px 22px 4px;')}>
+          <div data-r="stats" style={st('display:flex; gap:12px; padding:16px 22px 4px;')}>
             {v.stats.map(stx => (
               <div key={stx.label} style={st('flex:1; border:1px solid #ededf0; border-radius:12px; padding:13px 15px; display:flex; flex-direction:column; gap:6px; background:#fff;')}>
                 <span style={st('font-size:11.5px; color:#86868b; font-weight:500; display:flex; align-items:center; gap:6px;')}>
@@ -414,21 +515,21 @@ function App() {
           </div>
 
           {/* list header */}
-          <div style={st('display:flex; align-items:center; padding:14px 22px 8px; gap:14px; font-size:10.5px; font-weight:600; color:#a1a1a6; text-transform:uppercase; letter-spacing:0.05em;')}>
+          <div data-r="list-header" style={st('display:flex; align-items:center; padding:14px 22px 8px; gap:14px; font-size:10.5px; font-weight:600; color:#a1a1a6; text-transform:uppercase; letter-spacing:0.05em;')}>
             <span style={st('width:230px;')}>Lead</span>
             <span style={st('width:96px;')}>Status</span>
             <span style={st('width:120px;')}>Score</span>
             <span style={st('flex:1;')}>Latest activity</span>
             <span style={st('width:62px; text-align:right;')}>When</span>
           </div>
-          <div style={st('height:1px; background:#ededf0; margin:0 22px;')}></div>
+          <div data-r="list-divider" style={st('height:1px; background:#ededf0; margin:0 22px;')}></div>
 
           {/* rows */}
-          <div style={st('flex:1; overflow-y:auto; padding:4px 12px 16px;')}>
+          <div data-r="list" style={st('flex:1; overflow-y:auto; padding:4px 12px 16px;')}>
             {v.visibleLeads.map(ld => (
-              <Box key={ld.id} onClick={ld.onClick} style={'display:flex; align-items:center; gap:14px; padding:11px 10px; border-radius:10px; cursor:pointer; border-bottom:1px solid #f4f4f6;'} hover={'background:#f7f9fc;'}>
+              <Box key={ld.id} onClick={ld.onClick} data-r="row" style={'display:flex; align-items:center; gap:14px; padding:11px 10px; border-radius:10px; cursor:pointer; border-bottom:1px solid #f4f4f6;'} hover={'background:#f7f9fc;'}>
                 {/* lead */}
-                <div style={st(`width:230px; display:flex; align-items:center; gap:11px; min-width:0;`)}>
+                <div data-r="row-lead" style={st(`width:230px; display:flex; align-items:center; gap:11px; min-width:0;`)}>
                   <div style={st(`width:34px; height:34px; flex:none; border-radius:50%; background:${ld.avatarBg}; color:${ld.avatarColor}; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600;`)}>{ld.initials}</div>
                   <div style={st('min-width:0;')}>
                     <div style={st('font-size:13.5px; font-weight:600; letter-spacing:-0.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;')}>{ld.name}</div>
@@ -436,25 +537,25 @@ function App() {
                   </div>
                 </div>
                 {/* status */}
-                <div style={st('width:96px;')}>
+                <div data-r="row-status" style={st('width:96px;')}>
                   <span style={st(`font-size:10.5px; font-weight:700; letter-spacing:0.04em; color:${ld.statusColor}; background:${ld.statusBg}; padding:4px 9px; border-radius:6px;`)}>{ld.statusLabel}</span>
                 </div>
                 {/* score */}
-                <div style={st('width:120px; display:flex; align-items:center; gap:9px;')}>
+                <div data-r="row-score" style={st('width:120px; display:flex; align-items:center; gap:9px;')}>
                   <div style={st('flex:1; height:5px; background:#eeeef1; border-radius:3px; overflow:hidden;')}>
                     <div style={st(`height:100%; width:${ld.scorePct}; background:${ld.statusColor}; border-radius:3px;`)}></div>
                   </div>
                   <span style={st('font-size:12px; font-weight:600; color:#48484a; font-variant-numeric:tabular-nums; width:20px;')}>{ld.score}</span>
                 </div>
                 {/* activity */}
-                <div style={st('flex:1; min-width:0; display:flex; align-items:center; gap:8px;')}>
+                <div data-r="row-activity" style={st('flex:1; min-width:0; display:flex; align-items:center; gap:8px;')}>
                   {ld.byAria && (
                     <span style={st('font-size:9.5px; font-weight:700; color:#007aff; background:rgba(0,122,255,0.09); padding:2px 6px; border-radius:5px; flex:none;')}>ARIA</span>
                   )}
                   <span style={st('font-size:12.5px; color:#6e6e73; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;')}>{ld.snippet}</span>
                 </div>
                 {/* when */}
-                <div style={st('width:62px; text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:3px;')}>
+                <div data-r="row-when" style={st('width:62px; text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:3px;')}>
                   <span style={st('font-size:11.5px; color:#a1a1a6; font-variant-numeric:tabular-nums;')}>{ld.time}</span>
                   {ld.needsReply && (
                     <span style={st('width:6px; height:6px; border-radius:50%; background:#007aff;')}></span>
@@ -466,7 +567,7 @@ function App() {
         </div>
 
         {/* AI INSIGHTS PANEL */}
-        <div style={st('width:328px; flex:none; background:#fbfbfd; border-left:1px solid #e9e9ec; display:flex; flex-direction:column; overflow-y:auto;')}>
+        <div data-r="insights" style={st('width:328px; flex:none; background:#fbfbfd; border-left:1px solid #e9e9ec; display:flex; flex-direction:column; overflow-y:auto;')}>
           <div style={st('padding:18px 18px 14px; border-bottom:1px solid #ededf0;')}>
             <div style={st('display:flex; align-items:center; gap:10px;')}>
               <div style={st('width:32px; height:32px; border-radius:10px; background:linear-gradient(135deg,#0a84ff,#0040dd); display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,122,255,0.3);')}>
@@ -516,10 +617,10 @@ function App() {
 
       {/* ================= LEAD DETAIL ================= */}
       {v.isDetail && (
-      <div style={st('flex:1; display:flex; min-width:0;')}>
+      <div data-r="screen" style={st('flex:1; display:flex; min-width:0;')}>
 
         {/* LEFT: profile / score / intent / timeline */}
-        <div style={st('width:344px; flex:none; background:#fbfbfd; border-right:1px solid #e9e9ec; display:flex; flex-direction:column; overflow-y:auto;')}>
+        <div data-r="detail-profile" style={st('width:344px; flex:none; background:#fbfbfd; border-right:1px solid #e9e9ec; display:flex; flex-direction:column; overflow-y:auto;')}>
           <div style={st('padding:14px 18px; display:flex; align-items:center; gap:8px; border-bottom:1px solid #ededf0;')}>
             <Box onClick={goDashboard} style={'display:flex; align-items:center; gap:5px; color:#86868b; font-size:12.5px; font-weight:500; cursor:pointer;'} hover={'color:#1d1d1f;'}>
               <Icon html={ICONS.back} />
@@ -595,9 +696,9 @@ function App() {
         </div>
 
         {/* CENTER: conversation */}
-        <div style={st('flex:1; min-width:0; display:flex; flex-direction:column; background:#ffffff;')}>
+        <div data-r="conversation" style={st('flex:1; min-width:0; display:flex; flex-direction:column; background:#ffffff;')}>
           {/* conversation header */}
-          <div style={st('height:56px; flex:none; border-bottom:1px solid #ededf0; display:flex; align-items:center; padding:0 22px; gap:12px;')}>
+          <div data-r="topbar" style={st('height:56px; flex:none; border-bottom:1px solid #ededf0; display:flex; align-items:center; padding:0 22px; gap:12px;')}>
             <div style={st('display:flex; flex-direction:column;')}>
               <span style={st('font-size:14.5px; font-weight:600; letter-spacing:-0.01em;')}>Conversation</span>
               <span style={st('font-size:11px; color:#86868b;')}>WhatsApp · started 3 days ago</span>
@@ -617,7 +718,7 @@ function App() {
           </div>
 
           {/* messages */}
-          <div style={st('flex:1; overflow-y:auto; padding:22px 26px; display:flex; flex-direction:column; gap:14px; background:#fcfcfd;')}>
+          <div data-r="messages" style={st('flex:1; overflow-y:auto; padding:22px 26px; display:flex; flex-direction:column; gap:14px; background:#fcfcfd;')}>
             {v.messages.map((m, idx) => (
               <div key={idx} style={st(`display:flex; flex-direction:column; align-items:${m.align}; max-width:100%;`)}>
                 {m.showSender && (
@@ -649,7 +750,7 @@ function App() {
           </div>
 
           {/* composer */}
-          <div style={st('flex:none; border-top:1px solid #ededf0; padding:14px 26px 18px; background:#fff;')}>
+          <div data-r="composer" style={st('flex:none; border-top:1px solid #ededf0; padding:14px 26px 18px; background:#fff;')}>
             {v.aiOn && (
               <div style={st('margin-bottom:11px;')}>
                 <div style={st('font-size:11px; color:#86868b; margin-bottom:8px; display:flex; align-items:center; gap:6px;')}>
@@ -689,10 +790,10 @@ function App() {
           </Box>
         </div>
 
-        <div style={st('flex:1; display:flex; justify-content:center; padding:36px 24px;')}>
+        <div data-r="handoff-body" style={st('flex:1; display:flex; justify-content:center; padding:36px 24px;')}>
           <div style={st('width:680px; max-width:100%;')}>
             {/* header card */}
-            <div style={st('background:#fff; border:1px solid #ededf0; border-radius:18px; padding:26px 28px; box-shadow:0 1px 3px rgba(0,0,0,0.04); display:flex; align-items:center; gap:18px;')}>
+            <div data-r="handoff-header" style={st('background:#fff; border:1px solid #ededf0; border-radius:18px; padding:26px 28px; box-shadow:0 1px 3px rgba(0,0,0,0.04); display:flex; align-items:center; gap:18px;')}>
               <div style={st('width:48px; height:48px; flex:none; border-radius:13px; background:linear-gradient(135deg,#0a84ff,#0040dd); display:flex; align-items:center; justify-content:center; box-shadow:0 3px 10px rgba(0,122,255,0.32);')}>
                 <div style={st('width:18px; height:18px; border-radius:50%; border:3px solid #fff;')}></div>
               </div>
@@ -707,7 +808,7 @@ function App() {
             </div>
 
             {/* snapshot grid */}
-            <div style={st('display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px;')}>
+            <div data-r="handoff-snapshot" style={st('display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px;')}>
               {(v.sel.facts || []).map((f, idx) => (
                 <div key={idx} style={st('background:#fff; border:1px solid #ededf0; border-radius:13px; padding:14px 16px;')}>
                   <div style={st('font-size:11px; color:#a1a1a6; font-weight:500;')}>{f.label}</div>
@@ -748,7 +849,7 @@ function App() {
             </div>
 
             {/* CTAs */}
-            <div style={st('display:flex; gap:12px; margin:22px 0 12px;')}>
+            <div data-r="handoff-ctas" style={st('display:flex; gap:12px; margin:22px 0 12px;')}>
               <Box onClick={acceptHandoff} style={'flex:1; text-align:center; background:#007aff; color:#fff; padding:14px; border-radius:13px; font-size:14px; font-weight:600; cursor:pointer; box-shadow:0 2px 8px rgba(0,122,255,0.32);'} hover={'background:#0066d6;'}>Accept &amp; take over conversation</Box>
               <Box onClick={backToDetail} style={'text-align:center; background:#fff; border:1px solid #e0e0e4; color:#1d1d1f; padding:14px 20px; border-radius:13px; font-size:14px; font-weight:600; cursor:pointer;'} hover={'background:#f5f5f7;'}>Keep Aria on it</Box>
             </div>
